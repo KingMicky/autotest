@@ -1,0 +1,40 @@
+# Docker configurations for performance testing
+
+## K6 with InfluxDB output
+version: '3.8'
+
+services:
+  k6:
+    image: grafana/k6:latest
+    container_name: k6-runner
+    volumes:
+      - ./k6:/scripts
+      - ./reports:/reports
+    environment:
+      - K6_OUT=influxdb=http://influxdb:8086/k6
+    command: run /scripts/basic-load-test.js
+    depends_on:
+      - influxdb
+    networks:
+      - performance-testing
+
+  influxdb:
+    image: influxdb:1.8
+    container_name: influxdb-k6
+    environment:
+      - INFLUXDB_DB=k6
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=admin
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+    networks:
+      - performance-testing
+
+networks:
+  performance-testing:
+    driver: bridge
+
+volumes:
+  influxdb-data:

@@ -1,0 +1,42 @@
+{
+  "performance": {
+    "thresholds": {
+      "response_time_p95": 500,
+      "response_time_p99": 1000,
+      "error_rate_max": 1,
+      "throughput_min": 10
+    },
+    "load_patterns": {
+      "smoke": {
+        "virtual_users": 1,
+        "duration": "30s"
+      },
+      "load": {
+        "virtual_users": 10,
+        "duration": "5m"
+      },
+      "stress": {
+        "virtual_users": 50,
+        "duration": "10m"
+      },
+      "spike": {
+        "virtual_users": 100,
+        "duration": "2m"
+      }
+    }
+  },
+  "targets": {
+    "default": "https://httpbin.org",
+    "staging": "https://staging-api.example.com",
+    "production": "https://api.example.com"
+  },
+  "monitoring": {
+    "influxdb": {
+      "url": "http://localhost:8086",
+      "database": "k6"
+    },
+    "grafana": {
+      "url": "http://localhost:3000"
+    }
+  }
+}

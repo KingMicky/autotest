@@ -1,0 +1,52 @@
+{
+  "performance": {
+    "thresholds": {
+      "responseTime": {
+        "p95": 800,
+        "p99": 1500
+      },
+      "errorRate": 1,
+      "throughput": {
+        "min": 50
+      }
+    },
+    "tools": {
+      "k6": {
+        "enabled": true,
+        "outputFormat": "json"
+      },
+      "artillery": {
+        "enabled": true,
+        "outputFormat": "json"
+      },
+      "jmeter": {
+        "enabled": false,
+        "outputFormat": "jtl"
+      }
+    }
+  },
+  "reporting": {
+    "formats": [
+      "html",
+      "json"
+    ],
+    "destinations": [
+      "local",
+      "artifactory"
+    ],
+    "retention": {
+      "days": 30
+    }
+  },
+  "monitoring": {
+    "realtime": true,
+    "dashboard": "grafana",
+    "alerts": {
+      "enabled": true,
+      "channels": [
+        "email",
+        "slack"
+      ]
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "automated-performance-testing",
+  "version": "1.0.0",
+  "description": "Automated performance testing framework for DevOps integration",
+  "main": "index.js",
+  "scripts": {
+    "test:performance": "npm run test:k6 && npm run test:artillery",
+    "test:k6": "k6 run k6/basic-load-test.js",
+    "test:k6:stress": "k6 run k6/stress-test.js",
+    "test:k6:spike": "k6 run k6/spike-test.js",
+    "test:artillery": "artillery run artillery/basic-load-test.yml",
+    "test:artillery:quick": "artillery quick --count 10 --num 5 http://localhost:3000",
+    "test:jmeter": "jmeter -n -t jmeter/load-test.jmx -l reports/jmeter-results.jtl -e -o reports/jmeter-html",
+    "test:report": "node scripts/generate-report.js",
+    "test:ci": "npm run test:performance && npm run test:report",
+    "monitor:start": "docker-compose -f monitoring/docker-compose.yml up -d",
+    "monitor:stop": "docker-compose -f monitoring/docker-compose.yml down",
+    "setup": "node scripts/setup.js",
+    "clean": "rimraf reports/* && mkdir -p reports"
+  },
+  "keywords": [
+    "performance-testing",
+    "load-testing",
+    "devops",
+    "automation",
+    "k6",
+    "artillery",
+    "jmeter",
+    "ci-cd"
+  ],
+  "author": "DevOps Team",
+  "license": "MIT",
+  "dependencies": {
+    "artillery": "^2.0.0",
+    "dotenv": "^16.0.0",
+    "fs-extra": "^11.0.0",
+    "yaml": "^2.0.0"
+  },
+  "devDependencies": {
+    "rimraf": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "notes": {
+    "k6": "K6 should be installed separately. Visit https://k6.io/docs/getting-started/installation/ for installation instructions.",
+    "jmeter": "JMeter should be installed separately. Download from https://jmeter.apache.org/download_jmeter.cgi"
+  }
+}

@@ -1,0 +1,66 @@
+config:
+  target: "{{ $processEnvironment.API_URL || 'https://jsonplaceholder.typicode.com' }}"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "API Load Test"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ $processEnvironment.API_TOKEN || 'test-token' }}"
+
+scenarios:
+  - name: "CRUD Operations"
+    weight: 100
+    flow:
+      # Get all posts
+      - get:
+          url: "/posts"
+          expect:
+            - statusCode: 200
+          capture:
+            - json: "$[0].id"
+              as: "firstPostId"
+
+      # Get specific post
+      - get:
+          url: "/posts/{{ firstPostId }}"
+          expect:
+            - statusCode: 200
+
+      # Create new post
+      - post:
+          url: "/posts"
+          json:
+            title: "Test Post {{ $randomString() }}"
+            body: "This is a test post created by Artillery"
+            userId: "{{ $randomInt(1, 10) }}"
+          expect:
+            - statusCode: 201
+          capture:
+            - json: "$.id"
+              as: "newPostId"
+
+      # Update post
+      - put:
+          url: "/posts/{{ newPostId }}"
+          json:
+            id: "{{ newPostId }}"
+            title: "Updated Test Post"
+            body: "This post has been updated"
+            userId: 1
+          expect:
+            - statusCode: 200
+
+      # Delete post
+      - delete:
+          url: "/posts/{{ newPostId }}"
+          expect:
+            - statusCode: 200
+
+      - think: 1
+
+ensure:
+  p95: 800
+  p99: 1500
+  maxErrorRate: 2

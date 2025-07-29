@@ -1,0 +1,63 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL || 'https://httpbin.org' }}"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 10
+      name: "Ramp up load"
+    - duration: 300
+      arrivalRate: 15
+      name: "Sustained load"
+  defaults:
+    headers:
+      User-Agent: "Artillery Load Test"
+  processor: "./processors/custom-functions.js"
+
+scenarios:
+  - name: "Get requests"
+    weight: 60
+    flow:
+      - get:
+          url: "/get"
+          expect:
+            - statusCode: 200
+            - contentType: "application/json"
+      - think: 1
+
+  - name: "Post requests"
+    weight: 25
+    flow:
+      - post:
+          url: "/post"
+          json:
+            name: "{{ $randomString() }}"
+            email: "test{{ $randomInt(1, 1000) }}@example.com"
+            timestamp: "{{ $timestamp() }}"
+          expect:
+            - statusCode: 200
+      - think: 2
+
+  - name: "API workflow"
+    weight: 15
+    flow:
+      - get:
+          url: "/get"
+          capture:
+            - json: "$.origin"
+              as: "userOrigin"
+      - post:
+          url: "/post"
+          json:
+            origin: "{{ userOrigin }}"
+            workflow: true
+          expect:
+            - statusCode: 200
+      - think: 1
+
+# Performance thresholds
+ensure:
+  p95: 500  # 95th percentile response time should be < 500ms
+  p99: 1000 # 99th percentile response time should be < 1000ms
+  maxErrorRate: 1  # Error rate should be < 1%

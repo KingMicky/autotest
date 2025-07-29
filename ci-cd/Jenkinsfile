@@ -1,0 +1,194 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(
+            name: 'TEST_TYPE',
+            choices: ['smoke', 'load', 'stress', 'spike'],
+            description: 'Type of performance test to run'
+        )
+        string(
+            name: 'TARGET_URL',
+            defaultValue: 'https://httpbin.org',
+            description: 'Target URL for testing'
+        )
+        choice(
+            name: 'TOOL',
+            choices: ['k6', 'artillery', 'both'],
+            description: 'Performance testing tool to use'
+        )
+    }
+    
+    environment {
+        BASE_URL = "${params.TARGET_URL}"
+        TEST_TYPE = "${params.TEST_TYPE}"
+        TOOL = "${params.TOOL}"
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Setup Environment') {
+            steps {
+                script {
+                    sh 'mkdir -p reports'
+                    
+                    // Install Node.js dependencies
+                    sh 'npm ci'
+                    
+                    // Install K6 if needed
+                    if (env.TOOL == 'k6' || env.TOOL == 'both') {
+                        sh '''
+                            if ! command -v k6 &> /dev/null; then
+                                echo "Installing K6..."
+                                sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+                                echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+                                sudo apt-get update
+                                sudo apt-get install k6
+                            fi
+                        '''
+                    }
+                    
+                    // Install Artillery if needed
+                    if (env.TOOL == 'artillery' || env.TOOL == 'both') {
+                        sh 'npm install -g artillery@latest'
+                    }
+                }
+            }
+        }
+        
+        stage('Performance Tests') {
+            parallel {
+                stage('K6 Tests') {
+                    when {
+                        anyOf {
+                            environment name: 'TOOL', value: 'k6'
+                            environment name: 'TOOL', value: 'both'
+                        }
+                    }
+                    steps {
+                        script {
+                            def testFile = ""
+                            switch(env.TEST_TYPE) {
+                                case 'smoke':
+                                    testFile = "k6/smoke-test.js"
+                                    break
+                                case 'load':
+                                    testFile = "k6/basic-load-test.js"
+                                    break
+                                case 'stress':
+                                    testFile = "k6/stress-test.js"
+                                    break
+                                case 'spike':
+                                    testFile = "k6/spike-test.js"
+                                    break
+                            }
+                            
+                            sh "k6 run --out json=reports/k6-results.json ${testFile}"
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'reports/k6-*', allowEmptyArchive: true
+                        }
+                    }
+                }
+                
+                stage('Artillery Tests') {
+                    when {
+                        anyOf {
+                            environment name: 'TOOL', value: 'artillery'
+                            environment name: 'TOOL', value: 'both'
+                        }
+                    }
+                    steps {
+                        sh '''
+                            artillery run artillery/basic-load-test.yml --output reports/artillery-results.json
+                            artillery report reports/artillery-results.json --output reports/artillery-report.html
+                        '''
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'reports/artillery-*', allowEmptyArchive: true
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Generate Reports') {
+            steps {
+                sh 'node scripts/generate-report.js'
+                
+                publishHTML([
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'reports',
+                    reportFiles: '*.html',
+                    reportName: 'Performance Test Report'
+                ])
+            }
+        }
+        
+        stage('Performance Budget Check') {
+            steps {
+                script {
+                    def budgetCheck = sh(
+                        script: 'node scripts/check-budgets.js reports/',
+                        returnStatus: true
+                    )
+                    
+                    if (budgetCheck != 0) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo 'Performance budgets exceeded!'
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
+        }
+        
+        failure {
+            emailext (
+                subject: "Performance Test Failed: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                body: """
+                    Performance test failed for ${env.JOB_NAME}.
+                    
+                    Build: ${env.BUILD_NUMBER}
+                    Test Type: ${env.TEST_TYPE}
+                    Target URL: ${env.BASE_URL}
+                    Tool: ${env.TOOL}
+                    
+                    Check the logs: ${env.BUILD_URL}
+                """,
+                to: "${env.CHANGE_AUTHOR_EMAIL ?: 'devops@company.com'}"
+            )
+        }
+        
+        unstable {
+            emailext (
+                subject: "Performance Budgets Exceeded: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                body: """
+                    Performance tests completed but budgets were exceeded.
+                    
+                    Build: ${env.BUILD_NUMBER}
+                    Test Type: ${env.TEST_TYPE}
+                    Target URL: ${env.BASE_URL}
+                    Tool: ${env.TOOL}
+                    
+                    Check the reports: ${env.BUILD_URL}
+                """,
+                to: "${env.CHANGE_AUTHOR_EMAIL ?: 'devops@company.com'}"
+            )
+        }
+    }
+}
