@@ -1,5 +1,5 @@
 config:
-  target: "https://httpbin.org"
+  target: "${TARGET_URL:-https://httpbin.org}"
   phases:
     - duration: 60
       arrivalRate: 5

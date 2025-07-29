@@ -137,8 +137,9 @@ stages:
       displayName: 'Create reports directory'
 
     - script: |
-        artillery run artillery/basic-load-test.yml --output reports/artillery-results.json
-        artillery report reports/artillery-results.json --output reports/artillery-report.html
+        TARGET_URL=$(baseUrl) node scripts/process-template.js artillery/basic-load-test.template.yml artillery/runtime-config.yml
+        artillery run artillery/runtime-config.yml --output reports/artillery-results.json
+        node scripts/generate-artillery-report.js reports/artillery-results.json reports/artillery-report.html
       env:
         TARGET_URL: $(baseUrl)
       displayName: 'Run Artillery Tests'
